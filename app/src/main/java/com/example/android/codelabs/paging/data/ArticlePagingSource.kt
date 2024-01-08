@@ -2,6 +2,7 @@ package com.example.android.codelabs.paging.data
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import kotlin.math.max
 
@@ -10,15 +11,21 @@ private const val STARTING_KEY = 0
 private const val LOAD_DELAY_MILLIS = 3_000L
 
 private val firstArticleCreatedTime = LocalDateTime.now()
-class ArticlePagingSource : PagingSource<Int, Article>() {
 
-    private fun ensureValidKey(key: Int) = max(STARTING_KEY, key)
+
+
+
+class ArticlePagingSource : PagingSource<Int, Article>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Article> {
         // Bu ilk yüklemeyse sayfalamayı STARTING_KEY ile başlatın
-        val start = params.key ?: STARTING_KEY
+        val startKey = params.key ?: STARTING_KEY
         // params.loadSize tarafından belirtilen sayıda öğe yükleyin
-        val range = start.until(start + params.loadSize)
+        val range = startKey.until(startKey + params.loadSize)
+
+
+        if (startKey != STARTING_KEY) delay(LOAD_DELAY_MILLIS)
+
 
         //Sonuç başarılıysa LoadResult.Page
         return LoadResult.Page(
@@ -33,9 +40,13 @@ class ArticlePagingSource : PagingSource<Int, Article>() {
             },
 
             // Öğeleri STARTING_KEY'in arkasına yüklemeye çalışmadığımızdan emin olun
-            prevKey = when (start) {
+            prevKey = when (startKey) {
                 STARTING_KEY -> null
-                else -> ensureValidKey(key = range.first - params.loadSize)
+                else -> when (val prevKey = ensureValidKey(key = range.first - params.loadSize)) {
+                    // We're at the start, there's nothing more to load
+                    STARTING_KEY -> null
+                    else -> prevKey
+                }
             },
             nextKey = range.last + 1
         )
@@ -55,4 +66,7 @@ class ArticlePagingSource : PagingSource<Int, Article>() {
     /*
     * Şu anki UI'nin belirli bir konumundaki makaleye yakın olan makalenin id'sini alır ve bu id'yi kullanarak yeni bir PagingSource'un başlaması gereken anahtar değerini belirler. Bu, kullanıcının sayfalama işleminden sonra listenin başka bir sayfaya geçmesini önlemeye yardımcı olur ve daha tutarlı bir kullanıcı deneyimi sağlar.
     * */
+
+
+    private fun ensureValidKey(key: Int) = max(STARTING_KEY, key)
 }
